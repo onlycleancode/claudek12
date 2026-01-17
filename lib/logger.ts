@@ -1,24 +1,5 @@
-import { writeFileSync, appendFileSync, existsSync, mkdirSync } from "fs";
-import { join } from "path";
-
 // Generate session ID when the module is first loaded (server start)
 const SESSION_ID = new Date().toISOString().replace(/[:.]/g, "-");
-const LOGS_DIR = join(process.cwd(), "logs");
-const LOG_FILE = join(LOGS_DIR, `session-${SESSION_ID}.log`);
-
-// Ensure logs directory exists
-if (!existsSync(LOGS_DIR)) {
-  mkdirSync(LOGS_DIR, { recursive: true });
-}
-
-// Write session header
-writeFileSync(
-  LOG_FILE,
-  `================================================================================
-SESSION STARTED: ${new Date().toISOString()}
-SESSION ID: ${SESSION_ID}
-================================================================================\n\n`
-);
 
 export interface LogEntry {
   timestamp: string;
@@ -51,12 +32,7 @@ export function log(level: LogEntry["level"], source: string, message: string, d
   // Add to memory
   memoryLog.push(entry);
 
-  // Write to file
-  try {
-    appendFileSync(LOG_FILE, formatLogEntry(entry));
-  } catch (err) {
-    console.error("Failed to write to log file:", err);
-  }
+  // Skip file writing in serverless environments
 
   // Also console log
   const consoleMethod = level === "ERROR" ? console.error : level === "WARN" ? console.warn : console.log;
@@ -82,7 +58,6 @@ export function getSessionLogs(): LogEntry[] {
 export function getSessionInfo() {
   return {
     sessionId: SESSION_ID,
-    logFile: LOG_FILE,
     startTime: SESSION_ID,
     entryCount: memoryLog.length,
     errorCount: memoryLog.filter(e => e.level === "ERROR").length,
