@@ -739,7 +739,6 @@ function ReadingPractice({ onComplete }: { onComplete?: () => void }) {
   const [isComplete, setIsComplete] = useState(false);
   const [browserSupported, setBrowserSupported] = useState(true);
   const [lastSpoken, setLastSpoken] = useState("");
-  const [phoneticHint, setPhoneticHint] = useState<string | null>(null);
   const [attempts, setAttempts] = useState(0);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -802,25 +801,23 @@ function ReadingPractice({ onComplete }: { onComplete?: () => void }) {
   const checkWordMatch = async (
     spokenText: string,
     targetWord: string,
-    needHint: boolean,
-  ): Promise<{ matched: boolean; phoneticHint?: string }> => {
-    try {
-      const response = await fetch("/api/check-reading", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spokenText, targetWord, needHint }),
-      });
-      const data = await response.json();
-      return { matched: data.matched, phoneticHint: data.phoneticHint };
-    } catch {
-      // Fallback to simple matching
-      const normalizedSpoken = spokenText.toLowerCase().trim();
-      const normalizedTarget = targetWord
-        .toLowerCase()
-        .replace(/[.,!?]/g, "")
-        .trim();
-      return { matched: normalizedSpoken.includes(normalizedTarget) };
-    }
+  ): Promise<{ matched: boolean }> => {
+    // Simple local matching - faster and more reliable than API
+    const normalizedSpoken = spokenText.toLowerCase().trim();
+    const normalizedTarget = targetWord
+      .toLowerCase()
+      .replace(/[.,!?]/g, "")
+      .trim();
+    
+    // Check if the spoken text contains the target word
+    // Also check for common speech recognition variations
+    const matched = normalizedSpoken.includes(normalizedTarget) ||
+      normalizedSpoken.split(" ").some(word => 
+        word === normalizedTarget || 
+        (word.length > 2 && normalizedTarget.includes(word))
+      );
+    
+    return { matched };
   };
 
   // Handle moving to next word or sentence
@@ -835,7 +832,6 @@ function ReadingPractice({ onComplete }: { onComplete?: () => void }) {
     }
     setState("idle");
     setLastSpoken("");
-    setPhoneticHint(null);
     setAttempts(0);
   };
 
@@ -889,21 +885,12 @@ function ReadingPractice({ onComplete }: { onComplete?: () => void }) {
       const newAttempts = attempts + 1;
       setAttempts(newAttempts);
 
-      // Request hint on first failure
-      const needHint = newAttempts === 1;
-      const result = await checkWordMatch(
-        transcript,
-        currentTargetWord,
-        needHint,
-      );
+      const result = await checkWordMatch(transcript, currentTargetWord);
 
       if (result.matched) {
         setState("correct");
         setTimeout(() => advanceToNext(), 800);
       } else {
-        if (result.phoneticHint) {
-          setPhoneticHint(result.phoneticHint);
-        }
         // First wrong = show phonetic hint, second wrong = show audio hint
         if (newAttempts === 1) {
           setState("hint1");
