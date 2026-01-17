@@ -312,6 +312,10 @@ function WritingPractice({ onComplete }: { onComplete?: () => void }) {
 
     try {
       const imageData = canvas.toDataURL("image/png").split(",")[1];
+      
+      console.log("[WritingPractice] Canvas size:", canvas.width, "x", canvas.height);
+      console.log("[WritingPractice] Image data length:", imageData.length);
+      console.log("[WritingPractice] Image prefix:", imageData.substring(0, 50));
 
       const response = await fetch("/api/check-writing", {
         method: "POST",
@@ -326,7 +330,7 @@ function WritingPractice({ onComplete }: { onComplete?: () => void }) {
       console.log("[WritingPractice] API response:", response.status, data);
 
       if (!response.ok) {
-        console.error("[WritingPractice] API error:", data.error);
+        console.error("[WritingPractice] API error:", data.error, data.message);
         setState("incorrect");
         return;
       }
