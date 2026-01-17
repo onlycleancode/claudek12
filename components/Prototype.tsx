@@ -739,6 +739,7 @@ function ReadingPractice({ onComplete }: { onComplete?: () => void }) {
   const [isComplete, setIsComplete] = useState(false);
   const [browserSupported, setBrowserSupported] = useState(true);
   const [lastSpoken, setLastSpoken] = useState("");
+  const [phoneticHint, setPhoneticHint] = useState<string | null>(null);
   const [attempts, setAttempts] = useState(0);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
@@ -746,18 +747,6 @@ function ReadingPractice({ onComplete }: { onComplete?: () => void }) {
   const words = currentSentence.split(" ");
   const currentTargetWord = words[currentWordIndex];
   const cleanTargetWord = currentTargetWord.replace(/[.,!?]/g, "");
-
-  // Local phonetic hints - always available, no API dependency
-  const PHONETIC_HINTS: { [key: string]: string } = {
-    "the": "thuh",
-    "cat": "kuh - aah - tuh",
-    "sat": "sss - aah - tuh",
-    "i": "eye",
-    "see": "sss - eee",
-    "a": "uh",
-    "dog": "duh - aww - guh",
-  };
-  const localPhoneticHint = PHONETIC_HINTS[cleanTargetWord.toLowerCase()] || cleanTargetWord;
 
   // Check browser support on mount
   useEffect(() => {
@@ -798,33 +787,27 @@ function ReadingPractice({ onComplete }: { onComplete?: () => void }) {
   };
 
   // Check if spoken word matches target using Claude API
-  // Check if spoken word matches target using Claude API
   const checkWordMatch = async (
     spokenText: string,
     targetWord: string,
-  ): Promise<{ matched: boolean }> => {
+    needHint: boolean,
+  ): Promise<{ matched: boolean; phoneticHint?: string }> => {
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-      
       const response = await fetch("/api/check-reading", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spokenText, targetWord, needHint: true }),
-        signal: controller.signal,
+        body: JSON.stringify({ spokenText, targetWord, needHint }),
       });
-      clearTimeout(timeoutId);
-      
       const data = await response.json();
-      return { matched: data.matched };
-    } catch (err) {
-      console.error("[ReadingPractice] API error:", err);
-      // Fallback to simple local matching on error
+      return { matched: data.matched, phoneticHint: data.phoneticHint };
+    } catch {
+      // Fallback to simple matching
       const normalizedSpoken = spokenText.toLowerCase().trim();
-      const normalizedTarget = targetWord.toLowerCase().replace(/[.,!?]/g, "").trim();
-      const spokenWords = normalizedSpoken.split(/\s+/);
-      const matched = spokenWords.includes(normalizedTarget);
-      return { matched };
+      const normalizedTarget = targetWord
+        .toLowerCase()
+        .replace(/[.,!?]/g, "")
+        .trim();
+      return { matched: normalizedSpoken.includes(normalizedTarget) };
     }
   };
 
@@ -840,6 +823,7 @@ function ReadingPractice({ onComplete }: { onComplete?: () => void }) {
     }
     setState("idle");
     setLastSpoken("");
+    setPhoneticHint(null);
     setAttempts(0);
   };
 
@@ -854,14 +838,6 @@ function ReadingPractice({ onComplete }: { onComplete?: () => void }) {
       return;
     }
 
-    // Stop any existing recognition
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch {}
-      recognitionRef.current = null;
-    }
-
     setState("recording");
     setLastSpoken("");
 
@@ -871,21 +847,7 @@ function ReadingPractice({ onComplete }: { onComplete?: () => void }) {
     recognition.lang = "en-US";
     recognition.maxAlternatives = 1;
 
-    let hasResult = false;
-
-    // Timeout to prevent hanging - stop after 8 seconds
-    const timeout = setTimeout(() => {
-      if (recognitionRef.current && !hasResult) {
-        console.log("[ReadingPractice] Timeout - stopping recognition");
-        try {
-          recognitionRef.current.stop();
-        } catch {}
-      }
-    }, 8000);
-
     recognition.onresult = async (event: SpeechRecognitionEvent) => {
-      hasResult = true;
-      clearTimeout(timeout);
       const transcript = event.results[0][0].transcript.trim();
       setLastSpoken(transcript);
       setState("checking");
@@ -893,12 +855,21 @@ function ReadingPractice({ onComplete }: { onComplete?: () => void }) {
       const newAttempts = attempts + 1;
       setAttempts(newAttempts);
 
-      const result = await checkWordMatch(transcript, currentTargetWord);
+      // Request hint on first failure
+      const needHint = newAttempts === 1;
+      const result = await checkWordMatch(
+        transcript,
+        currentTargetWord,
+        needHint,
+      );
 
       if (result.matched) {
         setState("correct");
         setTimeout(() => advanceToNext(), 800);
       } else {
+        if (result.phoneticHint) {
+          setPhoneticHint(result.phoneticHint);
+        }
         // First wrong = show phonetic hint, second wrong = show audio hint
         if (newAttempts === 1) {
           setState("hint1");
@@ -909,7 +880,6 @@ function ReadingPractice({ onComplete }: { onComplete?: () => void }) {
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      clearTimeout(timeout);
       console.log("[ReadingPractice] Error:", event.error);
       if (
         event.error === "not-allowed" ||
@@ -925,12 +895,7 @@ function ReadingPractice({ onComplete }: { onComplete?: () => void }) {
     };
 
     recognition.onend = () => {
-      clearTimeout(timeout);
       recognitionRef.current = null;
-      // If no result was received, reset to idle state
-      if (!hasResult) {
-        setState("idle");
-      }
     };
 
     recognitionRef.current = recognition;
@@ -1228,7 +1193,7 @@ function ReadingPractice({ onComplete }: { onComplete?: () => void }) {
               {/* Phonetic hint */}
               <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-3 w-full text-center">
                 <p className="text-2xl font-bold text-amber-700 font-[family-name:var(--font-heading)]">
-                  {localPhoneticHint}
+                  {phoneticHint || cleanTargetWord}
                 </p>
               </div>
               {lastSpoken && (
@@ -1302,11 +1267,13 @@ function ReadingPractice({ onComplete }: { onComplete?: () => void }) {
                 Hear &quot;{cleanTargetWord}&quot;
               </button>
               {/* Phonetic hint still shown */}
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 w-full text-center">
-                <p className="text-sm text-slate-500 font-[family-name:var(--font-body)]">
-                  {localPhoneticHint}
-                </p>
-              </div>
+              {phoneticHint && (
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 w-full text-center">
+                  <p className="text-sm text-slate-500 font-[family-name:var(--font-body)]">
+                    {phoneticHint}
+                  </p>
+                </div>
+              )}
               <button
                 onClick={startRecording}
                 className="w-full px-6 py-3 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors font-[family-name:var(--font-body)] font-bold flex items-center justify-center gap-2"
