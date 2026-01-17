@@ -193,529 +193,340 @@ function AppWindow({
   );
 }
 
-// Writing Practice Component - Letter Tracing
+// Writing Practice Component - Freeform Drawing
 const LETTERS = ["A", "B", "C", "D"] as const;
 
-interface LetterProgress {
-  letter: string;
-  showGuide: boolean;
-  attempts: number;
-  passed: boolean;
-}
+type WritingState = "intro" | "active" | "checking" | "correct" | "incorrect";
 
 function WritingPractice({ onComplete }: { onComplete?: () => void }) {
+  const [state, setState] = useState<WritingState>("intro");
+  const [currentLetterIndex, setCurrentLetterIndex] = useState(0);
+  const [hasDrawn, setHasDrawn] = useState(false);
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [strokes, setStrokes] = useState<{ x: number; y: number }[][]>([]);
-  const [currentStroke, setCurrentStroke] = useState<
-    { x: number; y: number }[]
-  >([]);
-  const [result, setResult] = useState<{ passed: boolean } | null>(null);
-  const [isChecking, setIsChecking] = useState(false);
-  const [currentLetterIndex, setCurrentLetterIndex] = useState(0);
-  const [showGuide, setShowGuide] = useState(true);
-  const [lessonComplete, setLessonComplete] = useState(false);
-
-  // Track progress for each letter
-  const [progress, setProgress] = useState<LetterProgress[]>(
-    LETTERS.map((letter) => ({
-      letter,
-      showGuide: true,
-      attempts: 0,
-      passed: false,
-    })),
-  );
 
   const currentLetter = LETTERS[currentLetterIndex];
 
-  // Letter path definitions for drawing the guide
-  const letterPaths: {
-    [key: string]: { points: { x: number; y: number }[] }[];
-  } = {
-    A: [
-      {
-        points: [
-          { x: 0.5, y: 0.1 },
-          { x: 0.25, y: 0.9 },
-        ],
-      },
-      {
-        points: [
-          { x: 0.5, y: 0.1 },
-          { x: 0.75, y: 0.9 },
-        ],
-      },
-      {
-        points: [
-          { x: 0.33, y: 0.55 },
-          { x: 0.67, y: 0.55 },
-        ],
-      },
-    ],
-    B: [
-      {
-        points: [
-          { x: 0.25, y: 0.1 },
-          { x: 0.25, y: 0.9 },
-        ],
-      },
-      {
-        points: [
-          { x: 0.25, y: 0.1 },
-          { x: 0.6, y: 0.1 },
-          { x: 0.75, y: 0.25 },
-          { x: 0.6, y: 0.5 },
-          { x: 0.25, y: 0.5 },
-        ],
-      },
-      {
-        points: [
-          { x: 0.25, y: 0.5 },
-          { x: 0.65, y: 0.5 },
-          { x: 0.8, y: 0.7 },
-          { x: 0.65, y: 0.9 },
-          { x: 0.25, y: 0.9 },
-        ],
-      },
-    ],
-    C: [
-      {
-        points: [
-          { x: 0.8, y: 0.25 },
-          { x: 0.6, y: 0.1 },
-          { x: 0.35, y: 0.1 },
-          { x: 0.2, y: 0.3 },
-          { x: 0.2, y: 0.7 },
-          { x: 0.35, y: 0.9 },
-          { x: 0.6, y: 0.9 },
-          { x: 0.8, y: 0.75 },
-        ],
-      },
-    ],
-    D: [
-      {
-        points: [
-          { x: 0.25, y: 0.1 },
-          { x: 0.25, y: 0.9 },
-        ],
-      },
-      {
-        points: [
-          { x: 0.25, y: 0.1 },
-          { x: 0.55, y: 0.1 },
-          { x: 0.8, y: 0.3 },
-          { x: 0.8, y: 0.7 },
-          { x: 0.55, y: 0.9 },
-          { x: 0.25, y: 0.9 },
-        ],
-      },
-    ],
+  // Initialize canvas with white background
+  useEffect(() => {
+    if (state === "active") {
+      setTimeout(() => {
+        const canvas = canvasRef.current;
+        if (canvas) {
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+          }
+        }
+      }, 100);
+    }
+  }, [state, currentLetterIndex]);
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    setHasDrawn(false);
   };
 
-  const drawLetterGuide = (
-    ctx: CanvasRenderingContext2D,
-    width: number,
-    height: number,
+  // Canvas drawing handlers
+  const getCanvasCoords = (
+    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
   ) => {
-    if (!showGuide) return; // Skip if guide is disabled (harder mode)
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
 
-    const letter = letterPaths[currentLetter];
-    if (!letter) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
 
-    ctx.save();
-    ctx.setLineDash([8, 8]);
-    ctx.strokeStyle = "#CBD5E1";
-    ctx.lineWidth = 3;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    letter.forEach((stroke) => {
-      ctx.beginPath();
-      stroke.points.forEach((point, index) => {
-        const x = point.x * width;
-        const y = point.y * height;
-        if (index === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-      });
-      ctx.stroke();
-    });
-
-    ctx.restore();
+    if ("touches" in e) {
+      return {
+        x: (e.touches[0].clientX - rect.left) * scaleX,
+        y: (e.touches[0].clientY - rect.top) * scaleY,
+      };
+    } else {
+      return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY,
+      };
+    }
   };
 
-  const drawUserStrokes = (ctx: CanvasRenderingContext2D) => {
-    ctx.save();
-    ctx.strokeStyle = "#FF6B4A";
-    ctx.lineWidth = 4;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    [...strokes, currentStroke].forEach((stroke) => {
-      if (stroke.length < 2) return;
-      ctx.beginPath();
-      stroke.forEach((point, index) => {
-        if (index === 0) {
-          ctx.moveTo(point.x, point.y);
-        } else {
-          ctx.lineTo(point.x, point.y);
-        }
-      });
-      ctx.stroke();
-    });
-
-    ctx.restore();
-  };
-
-  const redrawCanvas = () => {
+  const startDrawing = (
+    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
+  ) => {
+    setIsDrawing(true);
+    setHasDrawn(true);
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // Clear canvas
-    ctx.fillStyle = "#FFFFFF";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const { x, y } = getCanvasCoords(e);
 
-    // Draw grid
-    ctx.strokeStyle = "#F1F5F9";
-    ctx.lineWidth = 1;
-    const gridSize = 20;
-    for (let x = 0; x <= canvas.width; x += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, canvas.height);
-      ctx.stroke();
-    }
-    for (let y = 0; y <= canvas.height; y += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(canvas.width, y);
-      ctx.stroke();
-    }
-
-    // Draw letter guide
-    drawLetterGuide(ctx, canvas.width, canvas.height);
-
-    // Draw user strokes
-    drawUserStrokes(ctx);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.strokeStyle = "#FF6B4A";
+    ctx.lineWidth = 6;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
   };
 
-  useEffect(() => {
-    redrawCanvas();
-  }, [strokes, currentStroke, currentLetter, showGuide]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const resizeCanvas = () => {
-      const parent = canvas.parentElement;
-      if (parent) {
-        canvas.width = parent.clientWidth;
-        canvas.height = parent.clientHeight;
-        redrawCanvas();
-      }
-    };
-
-    resizeCanvas();
-    window.addEventListener("resize", resizeCanvas);
-    return () => window.removeEventListener("resize", resizeCanvas);
-  }, []);
-
-  const getCanvasPoint = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top,
-    };
-  };
-
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    setIsDrawing(true);
-    setResult(null);
-    const point = getCanvasPoint(e);
-    setCurrentStroke([point]);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const draw = (
+    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
+  ) => {
     if (!isDrawing) return;
-    const point = getCanvasPoint(e);
-    setCurrentStroke((prev) => [...prev, point]);
-  };
-
-  const handleMouseUp = () => {
-    if (isDrawing && currentStroke.length > 0) {
-      setStrokes((prev) => [...prev, currentStroke]);
-      setCurrentStroke([]);
-    }
-    setIsDrawing(false);
-  };
-
-  const handleMouseLeave = () => {
-    if (isDrawing && currentStroke.length > 0) {
-      setStrokes((prev) => [...prev, currentStroke]);
-      setCurrentStroke([]);
-    }
-    setIsDrawing(false);
-  };
-
-  // Check accuracy using Claude Vision API
-  const checkAccuracy = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const allPoints = strokes.flat();
-    if (allPoints.length === 0) {
-      return; // Don't show result if nothing drawn
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    if ("touches" in e) {
+      e.preventDefault();
     }
 
-    setIsChecking(true);
+    const { x, y } = getCanvasCoords(e);
+
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    setIsDrawing(false);
+  };
+
+  // Check drawing with Claude Vision API
+  const checkDrawing = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    setState("checking");
 
     try {
-      // Capture canvas as base64 image
-      const imageData = canvas.toDataURL("image/png");
-      const base64 = imageData.replace("data:image/png;base64,", "");
+      const imageData = canvas.toDataURL("image/png").split(",")[1];
 
-      console.log(
-        "[WritingPractice] Sending request to API, image size:",
-        base64.length,
-      );
-
-      // Call API
       const response = await fetch("/api/check-writing", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ image: base64, letter: currentLetter }),
+        body: JSON.stringify({
+          image: imageData,
+          letter: currentLetter,
+        }),
       });
 
       const data = await response.json();
-      console.log("[WritingPractice] API response:", response.status, data);
 
-      if (!response.ok) {
-        console.error("[WritingPractice] API error:", data.error);
-        setResult({ passed: false });
-        return;
+      if (data.passed) {
+        setState("correct");
+      } else {
+        setState("incorrect");
       }
-
-      setResult({ passed: data.passed });
-    } catch (error) {
-      console.error("[WritingPractice] Error checking writing:", error);
-      setResult({ passed: false });
-    } finally {
-      setIsChecking(false);
+    } catch (err) {
+      console.error("[WritingPractice] Check error:", err);
+      setState("incorrect");
     }
   };
 
-  const clearCanvas = () => {
-    setStrokes([]);
-    setCurrentStroke([]);
-    setResult(null);
-  };
-
-  const handleNextLetter = () => {
-    // Update progress for current letter
-    setProgress((prev) =>
-      prev.map((p, i) =>
-        i === currentLetterIndex ? { ...p, passed: true } : p,
-      ),
-    );
-
-    // Move to next letter
+  // Move to next letter or complete
+  const goToNextLetter = () => {
     if (currentLetterIndex < LETTERS.length - 1) {
-      const nextIndex = currentLetterIndex + 1;
-      setCurrentLetterIndex(nextIndex);
-      // Start next letter WITHOUT guide (harder mode since they passed previous)
-      setShowGuide(false);
-      clearCanvas();
+      setCurrentLetterIndex(currentLetterIndex + 1);
+      setHasDrawn(false);
+      setState("active");
+      setTimeout(() => {
+        const canvas = canvasRef.current;
+        if (canvas) {
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.fillStyle = "#FFFFFF";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+          }
+        }
+      }, 100);
     } else {
-      // Completed all letters!
-      setLessonComplete(true);
+      onComplete?.();
     }
   };
 
-  const handleRetry = () => {
-    // Update attempts
-    setProgress((prev) =>
-      prev.map((p, i) =>
-        i === currentLetterIndex ? { ...p, attempts: p.attempts + 1 } : p,
-      ),
-    );
-
-    // If they failed without guide, show the guide for next attempt
-    if (!showGuide) {
-      setShowGuide(true);
-    }
-
-    clearCanvas();
-  };
-
-  const restartLesson = () => {
-    setCurrentLetterIndex(0);
-    setShowGuide(true);
-    setLessonComplete(false);
-    setProgress(
-      LETTERS.map((letter) => ({
-        letter,
-        showGuide: true,
-        attempts: 0,
-        passed: false,
-      })),
-    );
-    clearCanvas();
-  };
-
-  // Lesson complete screen
-  if (lessonComplete) {
+  // Intro view
+  if (state === "intro") {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center bg-slate-50 p-8">
-        <div className="bg-white rounded-3xl p-8 shadow-xl text-center max-w-md">
-          <div className="text-6xl mb-4">🏆</div>
-          <h2 className="text-3xl font-bold text-slate-700 font-[family-name:var(--font-heading)] mb-2">
-            Lesson Complete!
+      <div className="flex-1 flex flex-col items-center justify-center bg-slate-50 p-4">
+        <div className="bg-white rounded-3xl p-6 shadow-xl text-center max-w-md">
+          <div className="text-6xl mb-4">✏️</div>
+          <h2 className="text-2xl font-bold text-slate-700 font-[family-name:var(--font-heading)] mb-2">
+            Writing Time!
           </h2>
-          <p className="text-slate-500 font-[family-name:var(--font-body)] mb-6">
-            You&apos;ve practiced all the letters A - D. Great work!
+          <p className="text-slate-500 font-[family-name:var(--font-body)] mb-4">
+            Let&apos;s practice writing letters A - D
           </p>
 
-          {/* Progress summary */}
-          <div className="flex justify-center gap-3 mb-6">
-            {progress.map((p) => (
-              <div key={p.letter} className="flex flex-col items-center">
-                <div
-                  className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl font-bold ${
-                    p.passed
-                      ? "bg-green-100 text-green-600"
-                      : "bg-slate-100 text-slate-400"
-                  }`}
-                >
-                  {p.letter}
-                </div>
-                <span className="text-xs text-slate-400 mt-1">
-                  {p.passed ? "✓" : "-"}
-                </span>
-              </div>
-            ))}
-          </div>
-
           <button
-            onClick={onComplete || restartLesson}
+            onClick={() => setState("active")}
             className="px-6 py-3 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors font-[family-name:var(--font-body)]"
           >
-            {onComplete ? "Next Module" : "Practice Again"}
+            Start Writing
           </button>
         </div>
       </div>
     );
   }
 
-  return (
-    <div className="flex-1 flex flex-col bg-slate-50">
-      {/* Header with instructions */}
-      <div className="p-4 border-b border-slate-200 bg-white">
-        <p className="text-sm text-slate-500 font-[family-name:var(--font-body)] mb-1">
-          Today we are practicing writing letters A - D uppercase
-        </p>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl font-bold text-slate-700 font-[family-name:var(--font-heading)]">
-              Write the letter &quot;{currentLetter}&quot;
-            </span>
-            {!showGuide && (
-              <span className="px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded-full font-medium">
-                Challenge Mode
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={clearCanvas}
-              className="px-3 py-1.5 text-sm rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 transition-colors font-[family-name:var(--font-body)]"
-            >
-              Clear
-            </button>
-            <button
-              onClick={checkAccuracy}
-              disabled={isChecking}
-              className="px-3 py-1.5 text-sm rounded-lg bg-primary hover:bg-primary/90 text-white transition-colors font-[family-name:var(--font-body)] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isChecking ? "Checking..." : "Check"}
-            </button>
-          </div>
-        </div>
+  // Correct view
+  if (state === "correct") {
+    const isLastLetter = currentLetterIndex === LETTERS.length - 1;
 
-        {/* Progress indicators */}
-        <div className="flex items-center gap-2 mt-3">
-          {LETTERS.map((letter, index) => (
-            <div
-              key={letter}
-              className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-all ${
-                index === currentLetterIndex
-                  ? "bg-primary text-white scale-110"
-                  : progress[index].passed
-                    ? "bg-green-100 text-green-600"
-                    : "bg-slate-100 text-slate-400"
-              }`}
-            >
-              {letter}
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center bg-slate-50 p-4">
+        <div className="bg-white rounded-3xl p-6 shadow-xl text-center max-w-md">
+          <div className="text-6xl mb-4">🎉</div>
+          <h2 className="text-2xl font-bold text-slate-700 font-[family-name:var(--font-heading)] mb-2">
+            Great Job!
+          </h2>
+          <p className="text-slate-500 font-[family-name:var(--font-body)] mb-4">
+            You wrote the letter {currentLetter}!
+          </p>
+
+          <button
+            onClick={goToNextLetter}
+            className="px-6 py-3 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors font-[family-name:var(--font-body)]"
+          >
+            {isLastLetter ? "Finish Writing" : "Next Letter"}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Main drawing view
+  return (
+    <div className="flex-1 flex flex-col bg-slate-50 overflow-hidden">
+      {/* Compact Header */}
+      <div className="p-2 bg-white border-b border-slate-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500 font-[family-name:var(--font-body)]">
+              Letter {currentLetterIndex + 1}/{LETTERS.length}
+            </span>
+            <div className="flex items-center gap-1">
+              {LETTERS.map((letter, index) => (
+                <div
+                  key={letter}
+                  className={`w-2 h-2 rounded-full ${
+                    index < currentLetterIndex
+                      ? "bg-green-400"
+                      : index === currentLetterIndex
+                        ? "bg-primary"
+                        : "bg-slate-200"
+                  }`}
+                />
+              ))}
             </div>
-          ))}
+          </div>
+          <span className="text-2xl">✏️</span>
         </div>
       </div>
 
-      {/* Canvas Area */}
-      <div className="flex-1 relative p-4">
-        <div className="absolute inset-4 bg-white rounded-2xl shadow-lg overflow-hidden border-2 border-slate-200">
+      {/* Instruction */}
+      <div className="bg-amber-50 px-3 py-2 flex items-center justify-center gap-2">
+        <span className="text-4xl font-bold text-amber-700 font-[family-name:var(--font-heading)]">
+          {currentLetter}
+        </span>
+        <p className="text-base font-bold text-slate-700 font-[family-name:var(--font-heading)]">
+          Write the letter {currentLetter}!
+        </p>
+      </div>
+
+      {/* Drawing canvas */}
+      <div className="flex-1 p-2 min-h-0">
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden relative h-full border-2 border-slate-200">
           <canvas
             ref={canvasRef}
-            className="w-full h-full cursor-crosshair"
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-            onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseLeave}
+            width={300}
+            height={180}
+            className="w-full h-full touch-none"
+            onMouseDown={startDrawing}
+            onMouseMove={draw}
+            onMouseUp={stopDrawing}
+            onMouseLeave={stopDrawing}
+            onTouchStart={startDrawing}
+            onTouchMove={draw}
+            onTouchEnd={stopDrawing}
           />
-        </div>
 
-        {/* Result Overlay */}
-        {result && (
-          <div className="absolute inset-4 flex items-center justify-center bg-black/20 rounded-2xl">
-            <div
-              className={`bg-white rounded-2xl p-6 shadow-xl text-center max-w-xs ${result.passed ? "border-4 border-green-400" : "border-4 border-amber-400"}`}
-            >
-              <div className="text-5xl mb-4">{result.passed ? "🎉" : "🤔"}</div>
-              <h3
-                className={`text-2xl font-bold font-[family-name:var(--font-heading)] mb-4 ${result.passed ? "text-green-600" : "text-amber-600"}`}
-              >
-                {result.passed ? "Great Job!" : "Not Quite"}
-              </h3>
-              <button
-                onClick={result.passed ? handleNextLetter : handleRetry}
-                className="px-6 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors font-[family-name:var(--font-body)]"
-              >
-                {result.passed
-                  ? currentLetterIndex < LETTERS.length - 1
-                    ? "Next Letter"
-                    : "Finish!"
-                  : "Try Again"}
-              </button>
+          {/* Checking overlay */}
+          {state === "checking" && (
+            <div className="absolute inset-0 bg-white/80 flex items-center justify-center">
+              <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
             </div>
-          </div>
-        )}
+          )}
+
+          {/* Incorrect overlay */}
+          {state === "incorrect" && (
+            <div className="absolute inset-0 bg-amber-50/90 flex items-center justify-center p-4">
+              <div className="text-center">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="w-10 h-10 text-amber-500 mx-auto mb-2"
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  />
+                  <path
+                    d="M12 8v4M12 16h.01"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <p className="text-sm font-bold text-amber-700 font-[family-name:var(--font-body)]">
+                  Try again! Draw the letter {currentLetter}
+                </p>
+                <button
+                  onClick={() => {
+                    clearCanvas();
+                    setState("active");
+                  }}
+                  className="mt-2 px-4 py-1.5 bg-amber-500 text-white rounded-lg text-sm font-bold"
+                >
+                  Try Again
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Footer instructions */}
-      <div className="p-3 border-t border-slate-200 bg-white">
-        <p className="text-sm text-slate-500 text-center font-[family-name:var(--font-body)]">
-          {showGuide
-            ? "Trace the letter following the dotted lines"
-            : "Challenge: Write the letter from memory!"}
-        </p>
+      {/* Action buttons */}
+      <div className="p-2 bg-white border-t border-slate-200">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={clearCanvas}
+            className="px-3 h-10 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors font-[family-name:var(--font-body)] font-bold text-sm"
+          >
+            Clear
+          </button>
+          <button
+            onClick={checkDrawing}
+            disabled={!hasDrawn || state === "checking"}
+            className="flex-1 h-10 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors font-[family-name:var(--font-body)] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {state === "checking" ? "Checking..." : "Check Drawing"}
+          </button>
+        </div>
       </div>
     </div>
   );
