@@ -838,6 +838,14 @@ function ReadingPractice({ onComplete }: { onComplete?: () => void }) {
       return;
     }
 
+    // Stop any existing recognition
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.stop();
+      } catch {}
+      recognitionRef.current = null;
+    }
+
     setState("recording");
     setLastSpoken("");
 
@@ -847,7 +855,21 @@ function ReadingPractice({ onComplete }: { onComplete?: () => void }) {
     recognition.lang = "en-US";
     recognition.maxAlternatives = 1;
 
+    let hasResult = false;
+
+    // Timeout to prevent hanging - stop after 8 seconds
+    const timeout = setTimeout(() => {
+      if (recognitionRef.current && !hasResult) {
+        console.log("[ReadingPractice] Timeout - stopping recognition");
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+      }
+    }, 8000);
+
     recognition.onresult = async (event: SpeechRecognitionEvent) => {
+      hasResult = true;
+      clearTimeout(timeout);
       const transcript = event.results[0][0].transcript.trim();
       setLastSpoken(transcript);
       setState("checking");
@@ -880,6 +902,7 @@ function ReadingPractice({ onComplete }: { onComplete?: () => void }) {
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      clearTimeout(timeout);
       console.log("[ReadingPractice] Error:", event.error);
       if (
         event.error === "not-allowed" ||
@@ -895,7 +918,12 @@ function ReadingPractice({ onComplete }: { onComplete?: () => void }) {
     };
 
     recognition.onend = () => {
+      clearTimeout(timeout);
       recognitionRef.current = null;
+      // If no result was received, reset to idle state
+      if (!hasResult) {
+        setState("idle");
+      }
     };
 
     recognitionRef.current = recognition;

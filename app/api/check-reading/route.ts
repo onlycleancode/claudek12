@@ -57,40 +57,40 @@ export async function POST(request: NextRequest) {
     // Clean the target word (remove punctuation)
     const cleanTargetWord = targetWord.replace(/[.,!?]/g, "");
 
-    // Use Claude Haiku for fast, intelligent word matching + optional phonetic hint
+    // Generate phonetic hint locally instead of relying on Claude
+    const getPhoneticHint = (word: string): string => {
+      const phonetics: { [key: string]: string } = {
+        "the": "thuh",
+        "cat": "kuh - aah - tuh",
+        "sat": "sss - aah - tuh",
+        "i": "eye",
+        "see": "sss - eee",
+        "a": "uh",
+        "dog": "duh - aww - guh",
+      };
+      const lower = word.toLowerCase();
+      return phonetics[lower] || word.split("").join(" - ");
+    };
+
+    // Use Claude Haiku for fast, intelligent word matching only
     const response = await anthropic.messages.create({
       model: "claude-3-5-haiku-20241022",
-      max_tokens: 150,
+      max_tokens: 50,
       messages: [
         {
           role: "user",
-          content: `You are helping evaluate if a child (kindergarten age) correctly said a word while reading aloud.
+          content: `Did the child say the word "${cleanTargetWord}"?
+Child said: "${spokenText}"
 
-Target word: "${cleanTargetWord}"
-What the child said: "${spokenText}"
+Rules: Stuttering OK, filler words OK, similar sounds OK for young children.
 
-Did the child say the target word? Consider:
-- Stuttering is OK ("th-the" counts as "the")
-- Filler words are OK ("um the" counts as "the")  
-- Similar sounds are OK ("da" for "the" from young children)
-- Must be recognizably the same word or a reasonable attempt
-
-${needHint ? `If NOT matched, also provide a phonetic hint to help the child sound out the word.
-The hint should break the word into simple sounds that a kindergartener can understand.
-Examples:
-- "cat" -> "kuh - aah - tuh" 
-- "the" -> "thuh"
-- "dog" -> "duh - aww - guh"
-- "ball" -> "buh - aww - lll"
-- "run" -> "ruh - uhn"
-- "see" -> "sss - eee"
-Use simple sounds, not IPA symbols. Separate sounds with " - ".` : ""}
-
-Respond with ONLY valid JSON (no markdown, no code blocks):
-${needHint ? '{"matched": true/false, "phoneticHint": "hint if not matched or null"}' : '{"matched": true/false}'}`,
+Reply ONLY with JSON: {"matched": true} or {"matched": false}`,
         },
       ],
     });
+
+    // Add phonetic hint locally if needed
+    const phoneticHint = needHint ? getPhoneticHint(cleanTargetWord) : null;
 
     info("check-reading", "Claude API response received", { requestId });
 
@@ -128,11 +128,11 @@ ${needHint ? '{"matched": true/false, "phoneticHint": "hint if not matched or nu
       return NextResponse.json({ matched });
     }
 
-    info("check-reading", "Success", { requestId, matched: result.matched, phoneticHint: result.phoneticHint });
+    info("check-reading", "Success", { requestId, matched: result.matched, phoneticHint });
 
     return NextResponse.json({
       matched: result.matched,
-      phoneticHint: result.phoneticHint || null,
+      phoneticHint: !result.matched ? phoneticHint : null,
     });
   } catch (err) {
     error("check-reading", "Unhandled error", {
