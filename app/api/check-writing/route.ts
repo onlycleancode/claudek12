@@ -9,7 +9,7 @@ const anthropic = new Anthropic({
 // Helper to describe what each letter requires
 function getLetterRequirements(letter: string): string {
   const requirements: { [key: string]: string } = {
-    "A": "two diagonal lines meeting at top + horizontal crossbar in middle",
+    "A": "a triangle or tent shape (two lines going up and meeting), crossbar optional for kids",
     "B": "one vertical line on left + two bumps on right (top and bottom)",
     "C": "one curved line opening to the right",
     "D": "one vertical line on left + one large curved bump on right",
@@ -92,35 +92,29 @@ export async function POST(request: NextRequest) {
             },
             {
               type: "text",
-              text: `You are a kindergarten handwriting teacher evaluating a young child's attempt to write the uppercase letter "${letter}".
+              text: `You are evaluating a KINDERGARTENER's (age 5-6) attempt to write "${letter}".
 
-The image shows:
-- A grid background
-- There may or may not be a light gray dotted guide showing the letter shape
-- Orange/coral colored strokes representing the child's writing attempt
+The image has orange/coral strokes on a grid. There may be a gray dotted guide.
 
-IMPORTANT: This is a KINDERGARTENER (age 5-6). Be ENCOURAGING and LENIENT.
+BE VERY LENIENT - this is a small child learning to write!
 
-To PASS, the attempt needs to:
-1. Be roughly recognizable as the letter "${letter}" (doesn't need to be perfect!)
-2. Show the basic shape/structure (${getLetterRequirements(letter)})
-3. Show intentional effort (not pure random scribbles)
+For "${letter}", look for: ${getLetterRequirements(letter)}
 
-PASS generously if:
-- The letter is wobbly but recognizable
-- Proportions are off but the shape is there
-- Lines don't connect perfectly
-- The letter is messy but you can tell what they were trying to write
+PASS if you can tell they TRIED to write "${letter}" - even if:
+- Very wobbly or messy
+- Lines don't connect
+- Missing the crossbar (for A)
+- Wrong proportions
+- Looks like a child drew it
 
-Only FAIL if:
-- It's completely random scribbles with no letter structure
-- They clearly drew a different letter
-- There's almost nothing drawn
+ONLY FAIL if:
+- Random scribbles with no letter shape
+- Clearly a different letter
+- Almost nothing drawn
 
-When in doubt, PASS. We want to encourage the child!
+Default to PASS. Encourage the child!
 
-Respond with ONLY valid JSON (no markdown, no code blocks):
-{"passed": <true or false>}`,
+JSON only: {"passed": true} or {"passed": false}`,
             },
           ],
         },
