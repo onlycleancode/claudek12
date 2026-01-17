@@ -798,26 +798,34 @@ function ReadingPractice({ onComplete }: { onComplete?: () => void }) {
   };
 
   // Check if spoken word matches target using Claude API
+  // Check if spoken word matches target using Claude API
   const checkWordMatch = async (
     spokenText: string,
     targetWord: string,
   ): Promise<{ matched: boolean }> => {
-    // Simple local matching - faster and more reliable than API
-    const normalizedSpoken = spokenText.toLowerCase().trim();
-    const normalizedTarget = targetWord
-      .toLowerCase()
-      .replace(/[.,!?]/g, "")
-      .trim();
-    
-    // Check if the spoken text contains the target word
-    // Also check for common speech recognition variations
-    const matched = normalizedSpoken.includes(normalizedTarget) ||
-      normalizedSpoken.split(" ").some(word => 
-        word === normalizedTarget || 
-        (word.length > 2 && normalizedTarget.includes(word))
-      );
-    
-    return { matched };
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+      
+      const response = await fetch("/api/check-reading", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spokenText, targetWord, needHint: true }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      
+      const data = await response.json();
+      return { matched: data.matched };
+    } catch (err) {
+      console.error("[ReadingPractice] API error:", err);
+      // Fallback to simple local matching on error
+      const normalizedSpoken = spokenText.toLowerCase().trim();
+      const normalizedTarget = targetWord.toLowerCase().replace(/[.,!?]/g, "").trim();
+      const spokenWords = normalizedSpoken.split(/\s+/);
+      const matched = spokenWords.includes(normalizedTarget);
+      return { matched };
+    }
   };
 
   // Handle moving to next word or sentence
