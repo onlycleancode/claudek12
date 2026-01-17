@@ -1601,23 +1601,10 @@ function MathPractice({ onComplete }: { onComplete?: () => void }) {
       }
     } catch (err) {
       console.error("[MathPractice] Ball check error:", err);
-      // On error, be lenient and pass them
-      setState("correct");
+      setState("incorrect");
       setTimeout(() => {
-        if (currentProblem === "wordProblem1") {
-          if (wordProblemStep === "sallyDraw") {
-            setWordProblemStep("johnDraw");
-            setHasDrawn(false);
-            setState("active");
-            clearCanvas();
-          } else {
-            setCurrentProblem("wordProblem2");
-            initWordProblem2();
-          }
-        } else {
-          setIsModuleComplete(true);
-        }
-      }, 1200);
+        setState("active");
+      }, 1500);
     }
   };
 
@@ -2267,8 +2254,8 @@ function SciencePractice({ onComplete }: { onComplete?: () => void }) {
       }
     } catch (err) {
       console.error("[SciencePractice] Check error:", err);
-      // On error, be lenient
-      setState("correct");
+      setState("incorrect");
+      setFeedback("Something went wrong, try again!");
     }
   };
 

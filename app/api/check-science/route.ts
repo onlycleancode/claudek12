@@ -138,8 +138,7 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
         raw: content.text, 
         parseError: String(jsonError) 
       });
-      // On parse error, be lenient
-      return NextResponse.json({ passed: true, feedback: "" });
+      return NextResponse.json({ passed: false, feedback: "Try again!" });
     }
 
     info("check-science", "Success", { 
@@ -160,7 +159,6 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
       stack: err instanceof Error ? err.stack : undefined,
     });
     
-    // On error, be lenient for kids
-    return NextResponse.json({ passed: true, feedback: "" });
+    return NextResponse.json({ passed: false, feedback: "Something went wrong, try again!" });
   }
 }

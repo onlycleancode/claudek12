@@ -124,8 +124,7 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
         raw: content.text, 
         parseError: String(jsonError) 
       });
-      // On parse error, be lenient
-      return NextResponse.json({ passed: true, countedBalls: expectedCount });
+      return NextResponse.json({ passed: false, countedBalls: 0, error: "Parse error" });
     }
 
     info("check-math-balls", "Success", { 
@@ -147,7 +146,6 @@ Respond with ONLY valid JSON (no markdown, no code blocks):
       stack: err instanceof Error ? err.stack : undefined,
     });
     
-    // On error, be lenient for kids
-    return NextResponse.json({ passed: true });
+    return NextResponse.json({ passed: false, error: "Server error" });
   }
 }
