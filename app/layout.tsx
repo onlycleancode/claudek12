@@ -17,6 +17,9 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Claude for K-12 | Reimagining AI in Education",
   description: "Exploring innovative ways to bring AI to K-12 education - A program proposal for Anthropic",
+  icons: {
+    icon: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>",
+  },
 };
 
 export default function RootLayout({
