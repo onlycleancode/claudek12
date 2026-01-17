@@ -92,9 +92,9 @@ export async function POST(request: NextRequest) {
             },
             {
               type: "text",
-              text: `You are evaluating a KINDERGARTENER's (age 5-6) attempt to write "${letter}".
+              text: `You are evaluating a KINDERGARTENER's (age 5-6) attempt to write the letter "${letter}".
 
-The image has orange/coral strokes on a grid. There may be a gray dotted guide.
+The image shows orange/coral colored strokes drawn on a white canvas. This is the child's freehand drawing attempt.
 
 BE VERY LENIENT - this is a small child learning to write!
 
@@ -102,19 +102,19 @@ For "${letter}", look for: ${getLetterRequirements(letter)}
 
 PASS if you can tell they TRIED to write "${letter}" - even if:
 - Very wobbly or messy
-- Lines don't connect
-- Missing the crossbar (for A)
-- Wrong proportions
+- Lines don't connect perfectly
+- Missing parts (like crossbar for A)
+- Wrong proportions or size
 - Looks like a child drew it
 
 ONLY FAIL if:
-- Random scribbles with no letter shape
-- Clearly a different letter
-- Almost nothing drawn
+- Random scribbles with absolutely no letter shape
+- Clearly a completely different letter
+- Canvas is blank or nearly empty
 
-Default to PASS. Encourage the child!
+When in doubt, PASS! We want to encourage the child.
 
-JSON only: {"passed": true} or {"passed": false}`,
+Respond with ONLY this JSON: {"passed": true} or {"passed": false}`,
             },
           ],
         },

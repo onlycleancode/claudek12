@@ -323,8 +323,15 @@ function WritingPractice({ onComplete }: { onComplete?: () => void }) {
       });
 
       const data = await response.json();
+      console.log("[WritingPractice] API response:", response.status, data);
 
-      if (data.passed) {
+      if (!response.ok) {
+        console.error("[WritingPractice] API error:", data.error);
+        setState("incorrect");
+        return;
+      }
+
+      if (data.passed === true) {
         setState("correct");
       } else {
         setState("incorrect");
