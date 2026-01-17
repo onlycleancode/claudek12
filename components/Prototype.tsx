@@ -748,6 +748,18 @@ function ReadingPractice({ onComplete }: { onComplete?: () => void }) {
   const currentTargetWord = words[currentWordIndex];
   const cleanTargetWord = currentTargetWord.replace(/[.,!?]/g, "");
 
+  // Local phonetic hints - always available, no API dependency
+  const PHONETIC_HINTS: { [key: string]: string } = {
+    "the": "thuh",
+    "cat": "kuh - aah - tuh",
+    "sat": "sss - aah - tuh",
+    "i": "eye",
+    "see": "sss - eee",
+    "a": "uh",
+    "dog": "duh - aww - guh",
+  };
+  const localPhoneticHint = PHONETIC_HINTS[cleanTargetWord.toLowerCase()] || cleanTargetWord;
+
   // Check browser support on mount
   useEffect(() => {
     const SpeechRecognitionAPI =
@@ -1221,7 +1233,7 @@ function ReadingPractice({ onComplete }: { onComplete?: () => void }) {
               {/* Phonetic hint */}
               <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-3 w-full text-center">
                 <p className="text-2xl font-bold text-amber-700 font-[family-name:var(--font-heading)]">
-                  {phoneticHint || cleanTargetWord}
+                  {localPhoneticHint}
                 </p>
               </div>
               {lastSpoken && (
@@ -1295,13 +1307,11 @@ function ReadingPractice({ onComplete }: { onComplete?: () => void }) {
                 Hear &quot;{cleanTargetWord}&quot;
               </button>
               {/* Phonetic hint still shown */}
-              {phoneticHint && (
-                <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 w-full text-center">
-                  <p className="text-sm text-slate-500 font-[family-name:var(--font-body)]">
-                    {phoneticHint}
-                  </p>
-                </div>
-              )}
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 w-full text-center">
+                <p className="text-sm text-slate-500 font-[family-name:var(--font-body)]">
+                  {localPhoneticHint}
+                </p>
+              </div>
               <button
                 onClick={startRecording}
                 className="w-full px-6 py-3 bg-primary text-white rounded-xl hover:bg-primary/90 transition-colors font-[family-name:var(--font-body)] font-bold flex items-center justify-center gap-2"
