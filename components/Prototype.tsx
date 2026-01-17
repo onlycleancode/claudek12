@@ -236,19 +236,19 @@ function WritingPractice({ onComplete }: { onComplete?: () => void }) {
       {
         points: [
           { x: 0.5, y: 0.1 },
-          { x: 0.15, y: 0.9 },
+          { x: 0.25, y: 0.9 },
         ],
       },
       {
         points: [
           { x: 0.5, y: 0.1 },
-          { x: 0.85, y: 0.9 },
+          { x: 0.75, y: 0.9 },
         ],
       },
       {
         points: [
-          { x: 0.27, y: 0.55 },
-          { x: 0.73, y: 0.55 },
+          { x: 0.33, y: 0.55 },
+          { x: 0.67, y: 0.55 },
         ],
       },
     ],

@@ -92,27 +92,32 @@ export async function POST(request: NextRequest) {
             },
             {
               type: "text",
-              text: `You are a handwriting teacher evaluating a child's attempt to write the uppercase letter "${letter}".
+              text: `You are a kindergarten handwriting teacher evaluating a young child's attempt to write the uppercase letter "${letter}".
 
 The image shows:
 - A grid background
 - There may or may not be a light gray dotted guide showing the letter shape
 - Orange/coral colored strokes representing the child's writing attempt
 
-PASS/FAIL CRITERIA:
+IMPORTANT: This is a KINDERGARTENER (age 5-6). Be ENCOURAGING and LENIENT.
 
-To PASS, the attempt must:
-1. Be clearly recognizable as the letter "${letter}"
-2. Have ALL required parts: ${getLetterRequirements(letter)}
-3. Show reasonable control (not random scribbles)
+To PASS, the attempt needs to:
+1. Be roughly recognizable as the letter "${letter}" (doesn't need to be perfect!)
+2. Show the basic shape/structure (${getLetterRequirements(letter)})
+3. Show intentional effort (not pure random scribbles)
 
-FAIL if:
-- It's just scribbles or random marks
-- Missing major parts of the letter
-- Not recognizable as "${letter}"
-- Only partial attempt (e.g., single line when letter needs multiple strokes)
+PASS generously if:
+- The letter is wobbly but recognizable
+- Proportions are off but the shape is there
+- Lines don't connect perfectly
+- The letter is messy but you can tell what they were trying to write
 
-Be fair but not overly generous. If in doubt, fail.
+Only FAIL if:
+- It's completely random scribbles with no letter structure
+- They clearly drew a different letter
+- There's almost nothing drawn
+
+When in doubt, PASS. We want to encourage the child!
 
 Respond with ONLY valid JSON (no markdown, no code blocks):
 {"passed": <true or false>}`,
