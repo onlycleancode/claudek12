@@ -2,10 +2,6 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import { info, error, warn, getSessionLogs, getSessionInfo } from "@/lib/logger";
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
-
 // Helper to describe what each letter requires
 function getLetterRequirements(letter: string): string {
   const requirements: { [key: string]: string } = {
@@ -74,6 +70,10 @@ export async function POST(request: NextRequest) {
     }
 
     info("check-writing", `Calling Claude API`, { requestId, letter, imageSize: image.length });
+
+    const anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    });
 
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",

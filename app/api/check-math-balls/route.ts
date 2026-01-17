@@ -2,10 +2,6 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import { info, error, warn } from "@/lib/logger";
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
-
 export async function POST(request: NextRequest) {
   const requestId = Math.random().toString(36).substring(7);
   
@@ -50,6 +46,10 @@ export async function POST(request: NextRequest) {
       expectedCount, 
       personName,
       imageSize: image.length 
+    });
+
+    const anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
     });
 
     const response = await anthropic.messages.create({
